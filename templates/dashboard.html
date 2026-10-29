@@ -1,0 +1,261 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard | EcoCollect{% endblock %}
+
+{% block content %}
+
+<section class="dashboard">
+
+    <div class="dashboard-heading">
+        <div>
+            <span class="tag">ECOCOLLECT WORKSPACE</span>
+            <h1>Welcome, {{ user.name }}!</h1>
+            <p>Your role: {{ user.role|title }}</p>
+        </div>
+    </div>
+
+    {% if user.role == 'user' %}
+
+        <!-- USER DASHBOARD -->
+
+        <div class="dashboard-card">
+            <h2>♻ Your Green Points</h2>
+            <p class="points">
+                {{ user.points }} Points
+            </p>
+            <p>Thank you for choosing responsible recycling!</p>
+        </div>
+
+        <div class="dashboard-card">
+            <h2>📸 Identify E-Waste</h2>
+            <p>Upload an image to get a demo category suggestion.</p>
+
+            <form action="{{ url_for('identify') }}"
+                  method="POST"
+                  enctype="multipart/form-data">
+
+                <input type="file"
+                       name="photo"
+                       accept="image/png,image/jpeg,image/webp"
+                       required>
+
+                <button type="submit" class="btn">
+                    Identify Item
+                </button>
+            </form>
+        </div>
+
+        <div class="dashboard-card">
+            <h2>🚚 Book a Pickup</h2>
+
+            <form action="{{ url_for('book') }}" method="POST">
+
+                <label>Item Category</label>
+                <select name="category" required>
+                    <option value="">Select category</option>
+                    <option>Mobile phone</option>
+                    <option>Laptop / computer</option>
+                    <option>Battery</option>
+                    <option>Charger / cable</option>
+                    <option>Other electronics</option>
+                </select>
+
+                <label>Quantity</label>
+                <input type="number" name="quantity"
+                       min="1" value="1" required>
+
+                <label>Pickup Date</label>
+                <input type="date" name="pickup_date" required>
+
+                <label>Pickup Time</label>
+                <input type="time" name="pickup_time" required>
+
+                <label>Pickup Address</label>
+                <textarea name="address"
+                          placeholder="Enter your complete address"
+                          required></textarea>
+
+                <label>Additional Notes</label>
+                <textarea name="notes"
+                          placeholder="Any instructions for the collector"></textarea>
+
+                <button type="submit" class="btn">
+                    Request Pickup →
+                </button>
+
+            </form>
+        </div>
+
+        <div class="dashboard-card">
+            <h2>My Pickup Requests</h2>
+
+            {% if rows %}
+                {% for row in rows %}
+                    <div class="request-item">
+                        <h3>{{ row.category }}</h3>
+                        <p>Quantity: {{ row.quantity }}</p>
+                        <p>Date: {{ row.pickup_date }}</p>
+                        <p>Time: {{ row.pickup_time }}</p>
+                        <p>Address: {{ row.address }}</p>
+                        <p>Status: <strong>{{ row.status }}</strong></p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>No pickup requests yet.</p>
+            {% endif %}
+        </div>
+
+
+    {% elif user.role == 'collector' %}
+
+        <!-- COLLECTOR DASHBOARD -->
+
+        <div class="dashboard-card">
+            <h2>🚚 Pickup Requests</h2>
+            <p>Review requests and manage your assigned collections.</p>
+
+            {% if rows %}
+                {% for row in rows %}
+
+                    <div class="request-item">
+                        <h3>{{ row.category }}</h3>
+
+                        <p>Quantity: {{ row.quantity }}</p>
+                        <p>Pickup Date: {{ row.pickup_date }}</p>
+                        <p>Pickup Time: {{ row.pickup_time }}</p>
+                        <p>Address: {{ row.address }}</p>
+                        <p>Status: <strong>{{ row.status }}</strong></p>
+
+                        {% if row.image %}
+                            <img
+                                src="{{ url_for('static', filename='uploads/' + row.image) }}"
+                                alt="E-waste item"
+                                class="item-image"
+                            >
+                        {% endif %}
+
+                        {% if row.status == 'Pending' %}
+                            <form action="{{ url_for('accept', pid=row.id) }}"
+                                  method="POST">
+                                <button class="btn" type="submit">
+                                    Accept Request
+                                </button>
+                            </form>
+
+                        {% elif row.status == 'Accepted' %}
+
+                            <form action="{{ url_for('update_pickup', pid=row.id) }}"
+                                  method="POST">
+                                <input type="hidden"
+                                       name="status"
+                                       value="Picked up">
+
+                                <button class="btn" type="submit">
+                                    Mark as Picked Up
+                                </button>
+                            </form>
+
+                        {% elif row.status == 'Picked up' %}
+
+                            <form action="{{ url_for('update_pickup', pid=row.id) }}"
+                                  method="POST">
+
+                                <input type="hidden"
+                                       name="status"
+                                       value="Delivered to recycler">
+
+                                <label>Select Recycler</label>
+
+                                <select name="recycler_id" required>
+                                    <option value="">Choose recycler</option>
+
+                                    {% for recycler in recyclers %}
+                                        <option value="{{ recycler.id }}">
+                                            {{ recycler.name }}
+                                        </option>
+                                    {% endfor %}
+
+                                </select>
+
+                                <button class="btn" type="submit">
+                                    Deliver to Recycler
+                                </button>
+                            </form>
+
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+            {% else %}
+                <p>No pickup requests available.</p>
+            {% endif %}
+        </div>
+
+
+    {% elif user.role == 'recycler' %}
+
+        <!-- RECYCLER DASHBOARD -->
+
+        <div class="dashboard-card">
+            <h2>🏭 Incoming E-Waste</h2>
+            <p>Review delivered items and record their processing outcome.</p>
+
+            {% if rows %}
+                {% for row in rows %}
+
+                    <div class="request-item">
+
+                        <h3>{{ row.category }}</h3>
+
+                        <p>Quantity: {{ row.quantity }}</p>
+                        <p>Pickup Date: {{ row.pickup_date }}</p>
+                        <p>Status: <strong>{{ row.status }}</strong></p>
+
+                        {% if row.image %}
+                            <img
+                                src="{{ url_for('static', filename='uploads/' + row.image) }}"
+                                alt="E-waste item"
+                                class="item-image"
+                            >
+                        {% endif %}
+
+                        {% if row.status == 'Delivered to recycler' %}
+
+                            <form action="{{ url_for('process', pid=row.id) }}"
+                                  method="POST">
+
+                                <label>Processing Outcome</label>
+
+                                <select name="outcome" required>
+                                    <option value="">Select outcome</option>
+                                    <option>Recycled</option>
+                                    <option>Refurbished</option>
+                                    <option>Parts recovered</option>
+                                    <option>Needs review</option>
+                                </select>
+
+                                <button type="submit" class="btn">
+                                    Save Processing Record
+                                </button>
+
+                            </form>
+
+                        {% else %}
+                            <p>Processing outcome: {{ row.outcome }}</p>
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+            {% else %}
+                <p>No deliveries received yet.</p>
+            {% endif %}
+        </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}
